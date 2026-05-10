@@ -886,6 +886,7 @@ func handleAPIJobStart(w http.ResponseWriter, r *http.Request) {
 	job.CurrentLine = 0
 	job.Cancel = false
 	job.Error = ""
+	job.PauseLifted = false
 	job.StartedAt = now
 	job.UpdatedAt = now
 	job.Path = currentGCode
@@ -963,6 +964,7 @@ func handleAPIJobCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	job.Cancel = true
 	job.State = "cancelled"
+	job.PauseLifted = false
 	job.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	jobMu.Unlock()
 
@@ -1146,6 +1148,7 @@ func runCurrentJob() {
 	if job.State != "cancelled" {
 		job.State = "done"
 		job.Cancel = false
+		job.PauseLifted = false
 		job.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 	jobMu.Unlock()
@@ -1160,6 +1163,7 @@ func failJob(err error) {
 	jobMu.Lock()
 	job.State = "error"
 	job.Error = err.Error()
+	job.PauseLifted = false
 	job.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	jobMu.Unlock()
 
