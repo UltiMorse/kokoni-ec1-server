@@ -146,6 +146,13 @@ func main() {
 
 	log.Printf("kokoni_agent starting on %s", listenAddr)
 
+	go func() {
+		time.Sleep(800 * time.Millisecond)
+		if err := initUART(); err != nil {
+			log.Printf("startup UART init failed: %v", err)
+		}
+	}()
+
 	http.HandleFunc("/", handleIndex)
 
 	http.HandleFunc("/api/status", handleAPIStatus)
@@ -230,20 +237,70 @@ func loadState() {
 		return
 	}
 
-	if st.Job.Path != "" {
-		jobMu.Lock()
-		job = st.Job
-
-		// Never resume automatically after process restart.
-		if job.State == "printing" || job.State == "paused" || job.State == "pausing" {
-			job.State = "interrupted"
-			job.Error = "agent restarted while job was active"
-			job.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-		}
-
-		jobMu.Unlock()
-		log.Printf("[JOB] restored state: state=%s line=%d/%d file=%s", job.State, job.CurrentLine, job.TotalLines, job.FileName)
+	if st.Job.Path == "" {
+		return
 	}
+
+	needSave := false
+
+	jobMu.Lock()
+	job = st.Job
+
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	// Never resume automatically after process restart.
+	if job.State == "printing" || job.State == "paused" || job.State == "pausing" {
+		job.State = "interrupted"
+		job.Error = "agent restarted while job was active"
+		job.UpdatedAt = now
+		job.PauseLifted = false
+		needSave = true
+	}
+
+	// After reboot, terminal states are not useful as the default UI state.
+	// Keep the uploaded current.gcode available, but reset the job to uploaded.
+	if job.State == "cancelled" || job.State == "done" || job.State == "error" || job.State == "interrupted" {
+		if _, err := os.Stat(currentGCode); err == nil && job.TotalLines > 0 {
+			job.State = "uploaded"
+			job.Cancel = false
+			job.Error = ""
+			job.CurrentLine = 0
+			job.ProgressPct = 0
+			job.LastCommand = ""
+			job.PauseLifted = false
+			job.UpdatedAt = now
+			job.Path = currentGCode
+			needSave = true
+		} else {
+			job = JobStatus{
+				State:     "idle",
+				Path:      currentGCode,
+				UpdatedAt: now,
+			}
+			needSave = true
+		}
+	}
+
+	if job.State == "uploaded" {
+		job.Cancel = false
+		job.PauseLifted = false
+		job.CurrentLine = 0
+		job.ProgressPct = 0
+		job.Path = currentGCode
+		needSave = true
+	}
+
+	state := job.State
+	line := job.CurrentLine
+	total := job.TotalLines
+	file := job.FileName
+	jobMu.Unlock()
+
+	if needSave {
+		saveState()
+	}
+
+	log.Printf("[JOB] restored state: state=%s line=%d/%d file=%s", state, line, total, file)
 }
 
 func saveState() {
