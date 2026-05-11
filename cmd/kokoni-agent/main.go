@@ -1108,14 +1108,18 @@ func takePendingLight() (int, bool) {
 }
 
 func applyPendingLightIfAny() error {
-	value, ok := takePendingLight()
-	if !ok {
-		return nil
-	}
+    value, ok := takePendingLight()
+    if !ok {
+        return nil
+    }
 
-	cmd := fmt.Sprintf("M355 S%d", value)
-	log.Printf("[JOB] apply pending light -> %s", cmd)
-	return sendLineWaitOK(cmd)
+    cmd := fmt.Sprintf("M355 S%d", value)
+    log.Printf("[JOB] apply pending light -> %s", cmd)
+    err := sendLineWaitOK(cmd)
+    if err == nil {
+        time.Sleep(lineDelay)
+    }
+    return err
 }
 
 func runCurrentJob() {
