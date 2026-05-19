@@ -246,40 +246,40 @@ func loadState() {
 	jobMu.Lock()
 	job = st.Job
 
-	now := time.Now().UTC().Format(time.RFC3339)
+    now := time.Now().UTC().Format(time.RFC3339)
+    oldState := job.State
 
-	// Never resume automatically after process restart.
-	if job.State == "printing" || job.State == "paused" || job.State == "pausing" {
-		job.State = "interrupted"
-		job.Error = "agent restarted while job was active"
-		job.UpdatedAt = now
-		job.PauseLifted = false
-		needSave = true
-	}
-
-	// After reboot, terminal states are not useful as the default UI state.
-	// Keep the uploaded current.gcode available, but reset the job to uploaded.
-	if job.State == "cancelled" || job.State == "done" || job.State == "error" || job.State == "interrupted" {
-		if _, err := os.Stat(currentGCode); err == nil && job.TotalLines > 0 {
-			job.State = "uploaded"
-			job.Cancel = false
-			job.Error = ""
-			job.CurrentLine = 0
-			job.ProgressPct = 0
-			job.LastCommand = ""
-			job.PauseLifted = false
-			job.UpdatedAt = now
-			job.Path = currentGCode
-			needSave = true
-		} else {
-			job = JobStatus{
-				State:     "idle",
-				Path:      currentGCode,
-				UpdatedAt: now,
-			}
-			needSave = true
-		}
-	}
+    switch oldState {
+    case "printing", "paused", "pausing":
+        // Never resume automatically after process restart.
+        job.State = "interrupted"
+        job.Error = "agent restarted while job was active"
+        job.UpdatedAt = now
+        job.PauseLifted = false
+        needSave = true
+    case "cancelled", "done", "error", "interrupted":
+        // After reboot, terminal states are not useful as the default UI state.
+        // Keep the uploaded current.gcode available, but reset the job to uploaded.
+        if _, err := os.Stat(currentGCode); err == nil && job.TotalLines > 0 {
+            job.State = "uploaded"
+            job.Cancel = false
+            job.Error = ""
+            job.CurrentLine = 0
+            job.ProgressPct = 0
+            job.LastCommand = ""
+            job.PauseLifted = false
+            job.UpdatedAt = now
+            job.Path = currentGCode
+            needSave = true
+        } else {
+            job = JobStatus{
+                State:     "idle",
+                Path:      currentGCode,
+                UpdatedAt: now,
+            }
+            needSave = true
+        }
+    }
 
 	if job.State == "uploaded" {
 		job.Cancel = false
