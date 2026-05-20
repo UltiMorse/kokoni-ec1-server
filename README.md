@@ -30,6 +30,7 @@ KOKONI EC1 でテスト済みです。
 - Android: 5.1.1
 - MCU: Nations N32G452 / Marlinベースのファームウェア
 - MCU UART: `/dev/ttyS1` （ボーレート: 115200）
+- UltiMaker Curaの設定はconfigsの中にすべて入っている。
 
 **既知のプリンター制限:**
 - **ビルドボリューム**: X: 100 mm / Y: 100 mm / Z: 58 mm
