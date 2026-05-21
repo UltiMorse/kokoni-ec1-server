@@ -6,7 +6,7 @@
 - **SoC**: Rockchip RK3126C (ARM Cortex-A7 Quad-Core)
 - **OS**: Android 5.1.1
 - **ストレージ**: 4GB NAND Flash
-- **インターフェース**: Wi-Fi / Bluetooth / Micro USB
+- **インターフェース**: Wi-Fi / Bluetooth / Micro USB(これは内部にあるので、私は分解してシェルに穴をあけました。テスト用に欲しかっただけなので、無線で問題ないです。)
 - **通信・デバッグ**: UART (`/dev/ttyS1`, 115200bps) / DEBUG端子（TTL）
 
 ### 駆動制御基板
@@ -45,12 +45,6 @@ major minor  #blocks  name
 - `/data` → ext4, Read-Write
 - `/mnt/internal_sd` → FAT32, noexec
 
-```bash
-# 確認コマンド
-adb -d shell "cat /proc/partitions"
-adb -d shell "mount"
-```
-
 ---
 
 ## N32G452 MCU
@@ -80,7 +74,7 @@ GND
    - シリアルポート無応答
 2. Android OS起動
    - Rockchip RK3126C が起動
-   - 純正アプリ `com.dq.printer` が自動起動するが、これを止めて代替制御するのが目標
+   - 純正アプリ `com.dq.printer` が自動起動するが、これを止めて代替制御する
 3. ハンドシェイク
    - アプリがMCUへ「初期化完了」コマンドを送信
    - MCU: LED点滅停止 → ブザー長音
@@ -127,9 +121,21 @@ adb shell "su -c '(echo -ne "N-1 M110*15\r\n"; sleep 0.5; echo -ne "N0 M355 S0*9
 
 ---
 
+## フィラメントに関するメモ
+
+現在、デスクトップGUIでは測定済みのEC1プリセットを使用しています:
+
+```text
+ロード:   340 mm
+アンロード: 340 mm
+微調整:   +/-20 mm
+```
+
 ## バックアップ
 
 ### NANDバックアップ
+
+壊して学ぶものです(悟り)
 
 ```bash
 mkdir -p kokoni_backup && cd kokoni_backup
@@ -169,19 +175,9 @@ binwalk boot.img | head -n 30
            K R  N L          gzip
 ```
 
-### 壊れた原因
-
-ramdisk 内の `sepolicy` を `sepolicy-inject` で変更し、その変更済み `rknand_boot` を NAND に書き戻したこと。
-
-Android 5.1 / SELinux policy v26 の古い binary sepolicy に対して、`sepolicy-inject` の出力が実機の kernel/init と互換しなかった可能性
-
-通常 boot 失敗 → recovery へ fallback → adb shell が recovery で使えない → 最終的に MaskROM / Loader 経由で復旧。
-
-> 後から `parameter` を確認した結果、元々 kernel cmdline に `androidboot.selinux=permissive` が入っていた。つまり、本端末は本来 boot 時点で SELinux Permissive になる設計だったため、sepolicy を改造する必要はなかった。
-
 ### MaskROM / Loader へ入る
 
-壊れた後 USB接続では `recovery` として認識されたが、`adb shell` が使えなかったため、bootloader へ移行
+壊れると、USB接続では `recovery` として認識されたが、`adb shell` が使えなかったため、bootloader へ移行
 
 ```bash
 adb reboot bootloader

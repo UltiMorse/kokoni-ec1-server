@@ -70,7 +70,4 @@ adb -d shell "cat /dev/ttyS1"
 # 方法2: 十六進ダンプ（バイナリデータを確認）
 adb -d shell "hexdump -C /dev/ttyS1"
 
-# 方法3: strace で システムコール傍受
-strace -p <PID> -e write -s 256
-# ※ Android標準には strace が含まれていない場合が多い。確か今回は使えなかった。
 ```

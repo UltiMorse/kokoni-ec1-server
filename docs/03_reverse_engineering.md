@@ -50,11 +50,9 @@ adb -d pull /data/data/com.dq.printer/files/dbs/ ./kokoni_dbs/
 - `mqttAndroidService_bd`: MQTT通信ログ
 - `print_bd`: 印刷履歴・G-codeファイルパス管理
 
----
-
 ## システムアーキテクチャの確認
 
-### ネイティブライブラリの解剖
+### ネイティブライブラリ
 
 ```bash
 adb -d pull /data/app/com.dq.printer-2/lib/arm/libserial_port.so ./
