@@ -48,7 +48,8 @@ adb -s $KokoniAdb shell "su -c 'mkdir -p /data/local/kokoni_agent/jobs/uploaded'
 adb -s $KokoniAdb shell "su -c 'chmod -R 777 /data/local/kokoni_agent'"
 
 Write-Host "=== cleanup huge log ==="
-adb -s $KokoniAdb shell "su -c 'rm -f /data/local/kokoni_agent/current.log'"
+adb -s $KokoniAdb shell "su -c ': > /data/local/kokoni_agent/current.log'"
+adb -s $KokoniAdb shell "su -c 'chmod 666 /data/local/kokoni_agent/current.log'"
 
 Write-Host "=== start launcher ==="
 adb -s $KokoniAdb shell "su -c '/system/bin/kokoni_launcher start'"
