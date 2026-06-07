@@ -7,6 +7,9 @@ adb shell "setenforce 0" || true
 adb shell "su -c 'mkdir -p /data/local/kokoni_agent/jobs/uploaded'"
 adb shell "su -c 'chmod -R 777 /data/local/kokoni_agent'"
 
+echo "=== cleanup huge log ==="
+adb shell "su -c 'rm -f /data/local/kokoni_agent/current.log'"
+
 echo "=== start launcher ==="
 adb shell "su -c '/system/bin/kokoni_launcher start'"
 

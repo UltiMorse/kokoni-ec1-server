@@ -25,22 +25,54 @@ if [ "$ADB_READY" -eq 1 ]; then
   echo "Using Wi-Fi ADB: $ANDROID_SERIAL"
 else
   unset ANDROID_SERIAL
-  echo "Wi-Fi ADB not ready. Falling back to default adb device."
+  echo "Wi-Fi ADB not ready: $KOKONI_ADB" >&2
+  exit 1
 fi
 
 cd "$HOME/kokoni-ec1-server"
 ./scripts/run.sh
 
-echo "Waiting for kokoni agent..."
-for i in $(seq 1 30); do
-  if curl -fsS "$AGENT_URL" >/dev/null 2>&1; then
-    echo "kokoni agent is ready."
+echo "Waiting for kokoni agent and printer..."
+
+READY=0
+
+for i in $(seq 1 60); do
+  STATUS="$(curl -fsS "$AGENT_URL" 2>/dev/null || true)"
+
+  if echo "$STATUS" | grep -q '"agent":"running"' \
+    && echo "$STATUS" | grep -q '"printer":"ready"' \
+    && echo "$STATUS" | grep -q '"uart_connected":true'; then
+    echo "kokoni printer is ready."
+    READY=1
     break
   fi
 
-  echo "Waiting for agent API... ($i/30)"
+  echo "Waiting for printer ready... ($i/60)"
+  if [ -n "$STATUS" ]; then
+    echo "$STATUS"
+  fi
+
   sleep 1
 done
+
+if [ "$READY" -ne 1 ]; then
+  echo "kokoni printer did not become ready." >&2
+
+  echo "=== status ==="
+  curl -s "$AGENT_URL" || echo "curl failed"
+  echo
+
+  echo "=== launcher status ==="
+  adb -s "$KOKONI_ADB" shell "su -c '/system/bin/kokoni_launcher status'" || true
+
+  echo "=== ps ==="
+  adb -s "$KOKONI_ADB" shell "ps | grep kokoni || true" || true
+
+  echo "=== forward ==="
+  adb -s "$KOKONI_ADB" forward --list || true
+
+  exit 1
+fi
 
 cd "$HOME/kokoni-ec1-desktop"
 exec ./build/bin/kokoni-ec1-desktop

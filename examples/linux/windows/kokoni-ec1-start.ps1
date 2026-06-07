@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = "Stop"
 
-$KokoniAdb = "192.168.x.x:5555"
+$KokoniAdb = "192.168.11.25:5555"
 $AgentUrl = "http://127.0.0.1:18080/api/status"
 $DesktopDir = "C:\Users\YourUsername\src\kokoni-ec1-desktop"
 $DesktopExe = Join-Path $DesktopDir "build\bin\kokoni-ec1-desktop.exe"
@@ -28,56 +28,68 @@ if ($adbReady) {
     Write-Host "Using Wi-Fi ADB: $env:ANDROID_SERIAL"
 } else {
     Remove-Item Env:ANDROID_SERIAL -ErrorAction SilentlyContinue
-    Write-Host "Wi-Fi ADB not ready. Falling back to default adb device."
+    throw "Wi-Fi ADB not ready: $KokoniAdb"
 }
 
 Write-Host "=== adb root ==="
-adb root
+adb -s $KokoniAdb root
 
 Start-Sleep -Seconds 2
 
-if ($adbReady) {
-    adb connect $KokoniAdb | Out-Null
-    $env:ANDROID_SERIAL = $KokoniAdb
-}
+adb connect $KokoniAdb | Out-Null
+$env:ANDROID_SERIAL = $KokoniAdb
 
 try {
-    adb shell "setenforce 0"
+    adb -s $KokoniAdb shell "setenforce 0"
 } catch {
 }
 
-adb shell "su -c 'mkdir -p /data/local/kokoni_agent/jobs/uploaded'"
-adb shell "su -c 'chmod -R 777 /data/local/kokoni_agent'"
+adb -s $KokoniAdb shell "su -c 'mkdir -p /data/local/kokoni_agent/jobs/uploaded'"
+adb -s $KokoniAdb shell "su -c 'chmod -R 777 /data/local/kokoni_agent'"
+
+Write-Host "=== cleanup huge log ==="
+adb -s $KokoniAdb shell "su -c 'rm -f /data/local/kokoni_agent/current.log'"
 
 Write-Host "=== start launcher ==="
-adb shell "su -c '/system/bin/kokoni_launcher start'"
+adb -s $KokoniAdb shell "su -c '/system/bin/kokoni_launcher start'"
 
 try {
-    adb forward --remove tcp:18080 2>$null
+    adb -s $KokoniAdb forward --remove tcp:18080 2>$null
 } catch {
 }
 
-adb forward tcp:18080 tcp:8080
+adb -s $KokoniAdb forward tcp:18080 tcp:8080
 
 Write-Host "=== launcher status ==="
-adb shell "su -c '/system/bin/kokoni_launcher status'"
+adb -s $KokoniAdb shell "su -c '/system/bin/kokoni_launcher status'"
 
 Write-Host "=== ps ==="
-adb shell "ps | grep kokoni || true"
+adb -s $KokoniAdb shell "ps | grep kokoni || true"
 
-Write-Host "=== waiting for status ==="
+Write-Host "=== waiting for printer ready ==="
 
-$agentReady = $false
+$printerReady = $false
 
-for ($i = 1; $i -le 30; $i++) {
+for ($i = 1; $i -le 60; $i++) {
     try {
-        curl.exe -fsS $AgentUrl | Out-Null
-        $agentReady = $true
-        break
+        $status = curl.exe -fsS $AgentUrl
+
+        if (
+            $status -match '"agent":"running"' -and
+            $status -match '"printer":"ready"' -and
+            $status -match '"uart_connected":true'
+        ) {
+            $printerReady = $true
+            break
+        }
+
+        Write-Host "Waiting for printer ready... ($i/60)"
+        Write-Host $status
     } catch {
-        Write-Host "Waiting for agent API... ($i/30)"
-        Start-Sleep -Seconds 1
+        Write-Host "Waiting for agent API... ($i/60)"
     }
+
+    Start-Sleep -Seconds 1
 }
 
 Write-Host "=== status ==="
@@ -89,21 +101,28 @@ try {
     Write-Host "status request failed"
 }
 
-if (-not $agentReady) {
+if (-not $printerReady) {
     Write-Host ""
     Write-Host "=== debug: adb devices ==="
     adb devices
 
     Write-Host "=== debug: adb forward --list ==="
-    adb forward --list
+    adb -s $KokoniAdb forward --list
 
     Write-Host "=== debug: ps ==="
-    adb shell "ps | grep kokoni || true"
+    adb -s $KokoniAdb shell "ps | grep kokoni || true"
 
-    Write-Host "=== debug: log ==="
-    adb shell "tail -n 120 /data/local/kokoni_agent/current.log || true"
+    Write-Host "=== debug: launcher status ==="
+    adb -s $KokoniAdb shell "su -c '/system/bin/kokoni_launcher status'"
 
-    throw "kokoni agent API did not become ready: $AgentUrl"
+    Write-Host "=== debug: current.log last 120 lines ==="
+    try {
+        adb -s $KokoniAdb shell "cat /data/local/kokoni_agent/current.log" | Select-Object -Last 120
+    } catch {
+        Write-Host "could not read current.log"
+    }
+
+    throw "kokoni printer did not become ready: $AgentUrl"
 }
 
 Write-Host "=== launch desktop ==="
