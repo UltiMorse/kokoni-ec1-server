@@ -12,6 +12,8 @@ KOKONI EC1 3Dプリンター用コントローラーサーバー
 
 詳細な手順はdocsを参考にしてください。Windowsでの実行は適宜読みかえてください。
 
+同時に使用することを想定しているGUIはこちら: https://github.com/nakonanya/kokoni-ec1-desktop
+
 ## 環境
 
 開発環境はUbuntu24.04ですが、Windows11 proでも動作を確認しています。
